@@ -1,6 +1,7 @@
 import os
 import sys
 from fnmatch import fnmatchcase
+from unidecode import unidecode
 from typing import List, Tuple, Any, Callable
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
@@ -96,7 +97,7 @@ class Action(ActionGenerator):
 
 
 def prepare(s: str) -> str:
-    s = s.encode('utf-8').decode('ascii', 'replace')
+    s = unidecode(s)
     s = ''.join(repr(c)[1:-1] if c.isspace() else c for c in s)
     if len(s) > 500:
         s = s[:400] + '...' + s[:100]
