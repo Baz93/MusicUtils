@@ -2,6 +2,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from typing import Any, Tuple, Union, Callable, List
+from fnmatch import fnmatchcase
 import mutagen.id3
 from mutagen.id3 import ID3, ID3v1SaveOptions
 from mutagen.easyid3 import EasyID3
@@ -37,6 +38,7 @@ class AllId3TagsActionGenerator(ActionGenerator):
 
 def prepare(s: str) -> str:
     s = s.encode('utf-8').decode('ascii', 'replace')
+    s = ''.join(repr(c)[1:-1] if c.isspace() else c for c in s)
     if len(s) > 500:
         s = s[:400] + '...' + s[:100]
     return s
@@ -76,37 +78,43 @@ def id3_diff(value1, value2) -> List[str]:
 
 class Applier:
     def __init__(self, generators: List[ActionGenerator]) -> None:
-        self.yes_to_all = set()
-        self.no_to_all = set()
+        self.to_all = {}
         self.generators = generators
 
     @staticmethod
     def ask(question: str) -> Tuple[bool, bool]:
         print(question)
-        response = sys.stdin.readline().rstrip('\n')
-        if response == 'N':
-            return False, False
-        if response == 'Y':
-            return True, False
-        if response == 'NA':
-            return False, True
-        if response == 'YA':
-            return True, True
-        return Applier.ask("Please, input one of these: ['N', 'Y', 'NA', 'YA']")
+        while True:
+            response = sys.stdin.readline().rstrip('\n')
+            if response == 'N':
+                return False, False
+            if response == 'Y':
+                return True, False
+            if response == 'NA':
+                return False, True
+            if response == 'YA':
+                return True, True
+            print("Please, input one of these: ['N', 'Y', 'NA', 'YA']")
+
+    @staticmethod
+    def get_pattern(key: str) -> str:
+        print("Enter a pattern for the key: %s" % prepare(key))
+        while True:
+            response = sys.stdin.readline().rstrip('\n')
+            if fnmatchcase(key, response):
+                return response
+            print("Key doesn't match the pattern")
 
     def decide_action(self, path: str, key: str, diff: List[str]) -> bool:
-        if key in self.no_to_all:
-            return False
-        if key in self.yes_to_all:
-            return True
+        for pattern, value in self.to_all.items():
+            if fnmatchcase(key, pattern):
+                return value
         answer, assign_to_all = self.ask(
             "Perform action %s on %s?\n%s" % (prepare(key), prepare(path), '\n'.join(diff))
         )
         if assign_to_all:
-            if answer:
-                self.yes_to_all.add(key)
-            else:
-                self.no_to_all.add(key)
+            pattern = self.get_pattern(key)
+            self.to_all[pattern] = answer
         return answer
 
     def process_action(self, path: str, tags: EasyID3, action: Action) -> bool:
