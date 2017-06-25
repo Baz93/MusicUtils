@@ -1,12 +1,44 @@
 from typing import List
 import mutagen.id3
-from mutagen.easyid3 import EasyID3
 
-from .applier import Action, get_id3, AllId3TagsActionGenerator
+from .applier import Action, AllId3TagsActionGenerator, EasyID3Tags
+
+__all__ = ['MyTags', 'DoNothing', 'DeleteTag', 'DeleteUnacceptableTags', 'FixLyricsAttributes', 'action_list']
+
+
+class MyTags(EasyID3Tags):
+    pass
+
+
+def lyrics_get(id3, key):
+    return list(id3["USLT::eng"])
+
+
+def lyrics_set(id3, key, value):
+    assert len(value) == 1
+    id3.add(mutagen.id3.USLT(text=value[0], lang='eng'))
+
+
+def lyrics_delete(id3, key):
+    del (id3["USLT::eng"])
+
+
+MyTags.RegisterKey("lyrics", lyrics_get, lyrics_set, lyrics_delete)
+
+MyTags.RegisterTXXXKey('group', 'GROUP')
+MyTags.RegisterTXXXKey('country', 'COUNTRY')
+MyTags.RegisterTXXXKey('large_series', 'LARGESERIESINDICATOR')
+MyTags.RegisterTXXXKey('ext_artist', 'EXTENDEDARTIST')
+MyTags.RegisterTXXXKey('ext_album', 'EXTENDEDALBUM')
+MyTags.RegisterTXXXKey('ext_title', 'EXTENDEDTITLE')
+MyTags.RegisterTXXXKey('rym_type', 'RYMTYPE')
+MyTags.RegisterTXXXKey('rym_album', 'RYMALBUM')
+MyTags.RegisterTXXXKey('rym_artist', 'RYMARTIST')
+MyTags.RegisterTXXXKey('sec_genres', 'SECONDARYGENRES')
 
 
 class DoNothing(Action):
-    def apply(self, tags: EasyID3):
+    def apply(self, tags: MyTags):
         pass
 
     def key(self):
@@ -17,8 +49,8 @@ class DeleteTag(Action):
     def __init__(self, id3_tag_key: str):
         self.id3_tag_key = id3_tag_key
 
-    def apply(self, tags: EasyID3) -> None:
-        del get_id3(tags)[self.id3_tag_key]
+    def apply(self, tags: MyTags) -> None:
+        del tags.get_id3()[self.id3_tag_key]
 
     def key(self) -> str:
         return "DeleteTag %s" % self.id3_tag_key
@@ -36,44 +68,16 @@ class DeleteUnacceptableTags(AllId3TagsActionGenerator):
 
 
 class FixLyricsAttributes(Action):
-    def apply(self, tags: EasyID3) -> None:
-        lyrics_list = get_id3(tags).getall('USLT')
+    def apply(self, tags: MyTags) -> None:
+        lyrics_list = tags.get_id3().getall('USLT')
         if len(lyrics_list) == 0:
             return
         lyrics = max(lyrics_list, key=lambda l: len(l.text)).text
-        get_id3(tags).delall('USLT')
+        tags.get_id3().delall('USLT')
         tags['lyrics'] = lyrics
 
     def key(self) -> str:
         return "FixLyricsAttributes"
-
-
-def lyrics_get(id3, key):
-    return list(id3["USLT::eng"])
-
-
-def lyrics_set(id3, key, value):
-    assert len(value) == 1
-    id3.add(mutagen.id3.USLT(text=value[0], lang='eng'))
-
-
-def lyrics_delete(id3, key):
-    del(id3["USLT::eng"])
-
-
-def configure():
-    EasyID3.RegisterKey("lyrics", lyrics_get, lyrics_set, lyrics_delete)
-
-    EasyID3.RegisterTXXXKey('group', 'GROUP')
-    EasyID3.RegisterTXXXKey('country', 'COUNTRY')
-    EasyID3.RegisterTXXXKey('large_series', 'LARGESERIESINDICATOR')
-    EasyID3.RegisterTXXXKey('ext_artist', 'EXTENDEDARTIST')
-    EasyID3.RegisterTXXXKey('ext_album', 'EXTENDEDALBUM')
-    EasyID3.RegisterTXXXKey('ext_title', 'EXTENDEDTITLE')
-    EasyID3.RegisterTXXXKey('rym_type', 'RYMTYPE')
-    EasyID3.RegisterTXXXKey('rym_album', 'RYMALBUM')
-    EasyID3.RegisterTXXXKey('rym_artist', 'RYMARTIST')
-    EasyID3.RegisterTXXXKey('sec_genres', 'SECONDARYGENRES')
 
 
 action_list = [

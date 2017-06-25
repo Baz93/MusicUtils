@@ -1,7 +1,8 @@
+import os
 from argparse import ArgumentParser
 from typing import Any
 
-from tags.config import action_list, configure
+from tags.config import MyTags, action_list
 from tags.applier import *
 
 
@@ -13,8 +14,7 @@ def parse_arguments() -> Any:
 
 def main() -> None:
     args = parse_arguments()
-    configure()
-    Applier(action_list).apply_to_all([os.path.abspath(path) for path in args.path])
+    Applier(MyTags, action_list).apply_to_all([os.path.abspath(path) for path in args.path])
 
 
 if __name__ == '__main__':

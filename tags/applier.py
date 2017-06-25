@@ -1,51 +1,14 @@
 import os
 import sys
 from fnmatch import fnmatchcase
-from typing import List, Tuple
+from typing import List, Tuple, Any
 from mutagen.easyid3 import EasyID3
-from mutagen.id3 import ID3v1SaveOptions
+from mutagen.id3 import ID3, ID3v1SaveOptions
 
-
-def get_id3(tags: EasyID3):
-    return tags._EasyID3__id3
-
-
-class ActionGenerator:
-    def generate(self, tags: EasyID3) -> List['Action']:
-        raise NotImplementedError()
-
-
-class Action(ActionGenerator):
-    def generate(self, tags: EasyID3) -> List['Action']:
-        return [self]
-
-    def apply(self, tags: EasyID3) -> None:
-        raise NotImplementedError()
-
-    def key(self) -> str:
-        raise NotImplementedError()
-
-
-class AllId3TagsActionGenerator(ActionGenerator):
-    def generate(self, tags: EasyID3):
-        return [self.of_tag(tag) for tag in get_id3(tags)]
-
-    def of_tag(self, key: str) -> Action:
-        raise NotImplementedError()
-
-
-def prepare(s: str) -> str:
-    s = s.encode('utf-8').decode('ascii', 'replace')
-    s = ''.join(repr(c)[1:-1] if c.isspace() else c for c in s)
-    if len(s) > 500:
-        s = s[:400] + '...' + s[:100]
-    return s
-
-
-def parent_name(path: str, num: int) -> str:
-    if num == 0:
-        return os.path.basename(path)
-    return parent_name(os.path.dirname(path), num - 1)
+__all__ = [
+    'id3_diff', 'Tags', 'ID3Tags', 'EasyID3Tags',
+    'Action', 'ActionGenerator', 'AllId3TagsActionGenerator', 'Applier',
+]
 
 
 def id3_diff(value1, value2) -> List[str]:
@@ -74,9 +37,93 @@ def id3_diff(value1, value2) -> List[str]:
     return result
 
 
+class Tags:
+    def get_id3(self) -> ID3:
+        raise NotImplementedError()
+
+    def copy(self) -> Any:
+        raise NotImplementedError()
+
+    def restore(self, value: Any) -> None:
+        raise NotImplementedError()
+
+    @classmethod
+    def diff(cls, value1, value2):
+        raise NotImplementedError()
+
+
+class ID3Tags(Tags, ID3):
+    def get_id3(self) -> ID3:
+        return self
+
+    def copy(self) -> Any:
+        return self._copy()
+
+    def restore(self, value: Any) -> None:
+        return self._restore(value)
+
+    @classmethod
+    def diff(cls, value1, value2):
+        return id3_diff(value1, value2)
+
+
+class EasyID3Tags(Tags, EasyID3):
+    def get_id3(self) -> ID3:
+        return self._EasyID3__id3
+
+    def copy(self) -> Any:
+        return self.get_id3()._copy()
+
+    def restore(self, value: Any) -> None:
+        return self.get_id3()._restore(value)
+
+    @classmethod
+    def diff(cls, value1, value2):
+        return id3_diff(value1, value2)
+
+
+class ActionGenerator:
+    def generate(self, tags: Tags) -> List['Action']:
+        raise NotImplementedError()
+
+
+class Action(ActionGenerator):
+    def generate(self, tags: Tags) -> List['Action']:
+        return [self]
+
+    def apply(self, tags: Tags) -> None:
+        raise NotImplementedError()
+
+    def key(self) -> str:
+        raise NotImplementedError()
+
+
+class AllId3TagsActionGenerator(ActionGenerator):
+    def generate(self, tags: Tags):
+        return [self.of_tag(tag) for tag in tags.get_id3()]
+
+    def of_tag(self, key: str) -> Action:
+        raise NotImplementedError()
+
+
+def prepare(s: str) -> str:
+    s = s.encode('utf-8').decode('ascii', 'replace')
+    s = ''.join(repr(c)[1:-1] if c.isspace() else c for c in s)
+    if len(s) > 500:
+        s = s[:400] + '...' + s[:100]
+    return s
+
+
+def parent_name(path: str, num: int) -> str:
+    if num == 0:
+        return os.path.basename(path)
+    return parent_name(os.path.dirname(path), num - 1)
+
+
 class Applier:
-    def __init__(self, generators: List[ActionGenerator]) -> None:
+    def __init__(self, tags_class: type, generators: List[ActionGenerator]) -> None:
         self.to_all = {}
+        self.tags_class = tags_class
         self.generators = generators
 
     @staticmethod
@@ -115,16 +162,16 @@ class Applier:
             self.to_all[pattern] = answer
         return answer
 
-    def process_action(self, path: str, tags: EasyID3, action: Action) -> bool:
-        prev_value = get_id3(tags)._copy()
+    def process_action(self, path: str, tags: Tags, action: Action) -> bool:
+        prev_value = tags.copy()
         action.apply(tags)
-        new_value = get_id3(tags)._copy()
-        diff = id3_diff(prev_value, new_value)
+        new_value = tags.copy()
+        diff = tags.diff(prev_value, new_value)
         if len(diff) == 0:
             return False
         if self.decide_action(path, action.key(), diff):
             return True
-        get_id3(tags)._restore(prev_value)
+        tags.restore(prev_value)
         return False
 
     def apply(self, path: str) -> None:
@@ -137,7 +184,7 @@ class Applier:
                 print("%s has extension different from '.mp3'" % prepare(path))
                 return
 
-            tags = EasyID3(path)
+            tags = self.tags_class(path)
             tags_changed = False
 
             for generator in self.generators:
