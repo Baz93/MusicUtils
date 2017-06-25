@@ -3,11 +3,11 @@ import sys
 from fnmatch import fnmatchcase
 from typing import List, Tuple, Any
 from mutagen.easyid3 import EasyID3
-from mutagen.id3 import ID3, ID3v1SaveOptions
+from mutagen.id3 import ID3
 
 __all__ = [
     'id3_diff', 'Tags', 'ID3Tags', 'EasyID3Tags',
-    'Action', 'ActionGenerator', 'AllId3TagsActionGenerator', 'Applier',
+    'Action', 'ActionGenerator', 'Applier',
 ]
 
 
@@ -38,9 +38,6 @@ def id3_diff(value1, value2) -> List[str]:
 
 
 class Tags:
-    def get_id3(self) -> ID3:
-        raise NotImplementedError()
-
     def copy(self) -> Any:
         raise NotImplementedError()
 
@@ -48,14 +45,14 @@ class Tags:
         raise NotImplementedError()
 
     @classmethod
-    def diff(cls, value1, value2):
+    def diff(cls, value1: Any, value2: Any) -> List[str]:
+        raise NotImplementedError()
+
+    def write(self, path: str) -> None:
         raise NotImplementedError()
 
 
 class ID3Tags(Tags, ID3):
-    def get_id3(self) -> ID3:
-        return self
-
     def copy(self) -> Any:
         return self._copy()
 
@@ -63,7 +60,7 @@ class ID3Tags(Tags, ID3):
         return self._restore(value)
 
     @classmethod
-    def diff(cls, value1, value2):
+    def diff(cls, value1: Any, value2: Any) -> List[str]:
         return id3_diff(value1, value2)
 
 
@@ -78,7 +75,7 @@ class EasyID3Tags(Tags, EasyID3):
         return self.get_id3()._restore(value)
 
     @classmethod
-    def diff(cls, value1, value2):
+    def diff(cls, value1: Any, value2: Any) -> List[str]:
         return id3_diff(value1, value2)
 
 
@@ -95,14 +92,6 @@ class Action(ActionGenerator):
         raise NotImplementedError()
 
     def key(self) -> str:
-        raise NotImplementedError()
-
-
-class AllId3TagsActionGenerator(ActionGenerator):
-    def generate(self, tags: Tags):
-        return [self.of_tag(tag) for tag in tags.get_id3()]
-
-    def of_tag(self, key: str) -> Action:
         raise NotImplementedError()
 
 
@@ -193,7 +182,7 @@ class Applier:
                         tags_changed = True
 
             if tags_changed:
-                tags.save(path, v1=ID3v1SaveOptions.CREATE, v2_version=3)
+                tags.write(path)
 
         except:
             print("Error occured while processing %s" % prepare(path))

@@ -1,13 +1,18 @@
 from typing import List
 import mutagen.id3
+from mutagen.id3 import ID3v1SaveOptions
 
-from .applier import Action, AllId3TagsActionGenerator, EasyID3Tags
+from .applier import Action, ActionGenerator, EasyID3Tags
 
-__all__ = ['MyTags', 'DoNothing', 'DeleteTag', 'DeleteUnacceptableTags', 'FixLyricsAttributes', 'action_list']
+__all__ = [
+    'MyTags', 'AllId3TagsActionGenerator', 'DoNothing', 'DeleteTag',
+    'DeleteUnacceptableTags', 'FixLyricsAttributes', 'action_list',
+]
 
 
 class MyTags(EasyID3Tags):
-    pass
+    def write(self, path: str):
+        self.save(path, v1=ID3v1SaveOptions.CREATE, v2_version=3)
 
 
 def lyrics_get(id3, key):
@@ -35,6 +40,14 @@ MyTags.RegisterTXXXKey('rym_type', 'RYMTYPE')
 MyTags.RegisterTXXXKey('rym_album', 'RYMALBUM')
 MyTags.RegisterTXXXKey('rym_artist', 'RYMARTIST')
 MyTags.RegisterTXXXKey('sec_genres', 'SECONDARYGENRES')
+
+
+class AllId3TagsActionGenerator(ActionGenerator):
+    def generate(self, tags: MyTags):
+        return [self.of_tag(tag) for tag in tags.get_id3()]
+
+    def of_tag(self, key: str) -> Action:
+        raise NotImplementedError()
 
 
 class DoNothing(Action):
