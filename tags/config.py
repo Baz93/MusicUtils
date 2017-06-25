@@ -1,6 +1,6 @@
 from typing import List
 import mutagen.id3
-from mutagen.id3 import ID3v1SaveOptions
+from mutagen.id3 import ID3v1SaveOptions, ID3
 
 from .applier import Action, ActionGenerator, EasyID3Tags
 
@@ -15,17 +15,17 @@ class MyTags(EasyID3Tags):
         self.save(path, v1=ID3v1SaveOptions.CREATE, v2_version=3)
 
 
-def lyrics_get(id3, key):
-    return list(id3["USLT::eng"])
+def lyrics_get(id3: ID3, key: str) -> List[str]:
+    return [id3["USLT::eng"]]
 
 
-def lyrics_set(id3, key, value):
+def lyrics_set(id3: ID3, key: str, value: List[str]) -> None:
     assert len(value) == 1
     id3.add(mutagen.id3.USLT(text=value[0], lang='eng'))
 
 
-def lyrics_delete(id3, key):
-    del (id3["USLT::eng"])
+def lyrics_delete(id3: ID3, key: str) -> None:
+    del id3["USLT::eng"]
 
 
 MyTags.RegisterKey("lyrics", lyrics_get, lyrics_set, lyrics_delete)
@@ -43,7 +43,7 @@ MyTags.RegisterTXXXKey('sec_genres', 'SECONDARYGENRES')
 
 
 class AllId3TagsActionGenerator(ActionGenerator):
-    def generate(self, tags: MyTags):
+    def generate(self, tags: MyTags) -> List[Action]:
         return [self.of_tag(tag) for tag in tags.get_id3()]
 
     def of_tag(self, key: str) -> Action:
@@ -51,15 +51,15 @@ class AllId3TagsActionGenerator(ActionGenerator):
 
 
 class DoNothing(Action):
-    def apply(self, tags: MyTags):
+    def apply(self, tags: MyTags) -> None:
         pass
 
-    def key(self):
+    def key(self) -> str:
         return "DoNothing"
 
 
 class DeleteTag(Action):
-    def __init__(self, id3_tag_key: str):
+    def __init__(self, id3_tag_key: str) -> None:
         self.id3_tag_key = id3_tag_key
 
     def apply(self, tags: MyTags) -> None:
@@ -70,7 +70,7 @@ class DeleteTag(Action):
 
 
 class DeleteUnacceptableTags(AllId3TagsActionGenerator):
-    def __init__(self, acceptable_tags: List[str]):
+    def __init__(self, acceptable_tags: List[str]) -> None:
         self.acceptable_tags = acceptable_tags
 
     def of_tag(self, key: str) -> Action:
