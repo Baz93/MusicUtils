@@ -1,7 +1,7 @@
 import os
 import sys
 from fnmatch import fnmatchcase
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Callable
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
@@ -110,9 +110,9 @@ def parent_name(path: str, num: int) -> str:
 
 
 class Applier:
-    def __init__(self, tags_class: type, generators: List[ActionGenerator]) -> None:
+    def __init__(self, get_tags: Callable[[str], Tags], generators: List[ActionGenerator]) -> None:
         self.to_all = {}
-        self.tags_class = tags_class
+        self.get_tags = get_tags
         self.generators = generators
 
     @staticmethod
@@ -173,7 +173,7 @@ class Applier:
                 print("%s has extension different from '.mp3'" % prepare(path))
                 return
 
-            tags = self.tags_class(path)
+            tags = self.get_tags(path)
             tags_changed = False
 
             for generator in self.generators:
