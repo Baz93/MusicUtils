@@ -1,8 +1,17 @@
+import sys
+import os
 from typing import List
+from tempfile import NamedTemporaryFile
+from contextlib import contextmanager
+
 import mutagen.id3
 from mutagen.id3 import ID3v1SaveOptions, ID3
 
-from .applier import Action, ActionGenerator, EasyID3Tags
+sys.path.insert(0, 'D:\\Programming\\dimensions')
+
+from dimensions import dimensions
+
+from .applier import Action, ActionGenerator, EasyID3Tags, prepare
 
 __all__ = [
     'MyTags', 'AllId3TagsActionGenerator', 'DoNothing', 'DeleteTag',
@@ -15,8 +24,24 @@ class MyTags(EasyID3Tags):
         self.save(path, v1=ID3v1SaveOptions.CREATE, v2_version=3)
 
 
+@contextmanager
+def temp_input(data):
+    temp = NamedTemporaryFile(delete=False)
+    temp.write(data)
+    temp.close()
+    try:
+        yield temp.name
+    finally:
+        os.unlink(temp.name)
+
+
+def image_info(data: bytes):
+    with temp_input(data) as image:
+        return dimensions(image)[:3]
+
+
 def lyrics_get(id3: ID3, key: str) -> List[str]:
-    return [id3["USLT::eng"]]
+    return [id3["USLT::eng"].text]
 
 
 def lyrics_set(id3: ID3, key: str, value: List[str]) -> None:
@@ -28,17 +53,50 @@ def lyrics_delete(id3: ID3, key: str) -> None:
     del id3["USLT::eng"]
 
 
+def picture_get(id3: ID3, key: str) -> List[bytes]:
+    return [id3["APIC:"].data]
+
+
+def picture_set(id3: ID3, key: str, value: List[bytes]) -> None:
+    assert len(value) == 1
+    id3.add(mutagen.id3.APIC(data=value[0], mime=image_info(value[0])[2]))
+
+
+def picture_delete(id3: ID3, key: str) -> None:
+    del id3["APIC:"]
+
+
 MyTags.RegisterKey("lyrics", lyrics_get, lyrics_set, lyrics_delete)
+MyTags.RegisterKey("pic", lyrics_get, lyrics_set, lyrics_delete)
 
 MyTags.RegisterTXXXKey('group', 'GROUP')
 MyTags.RegisterTXXXKey('country', 'COUNTRY')
+MyTags.RegisterTXXXKey('series', 'SERIES')
 MyTags.RegisterTXXXKey('large_series', 'LARGESERIESINDICATOR')
+MyTags.RegisterTXXXKey('artist_trans', 'ALBUMTRANSLATION')
+MyTags.RegisterTXXXKey('album_trans', 'ALBUMTRANSLATION')
+MyTags.RegisterTXXXKey('title_trans', 'TITLETRANSLATION')
+MyTags.RegisterTXXXKey('artist_app', 'ALBUMAPPENDIX')
+MyTags.RegisterTXXXKey('album_app', 'ALBUMAPPENDIX')
+MyTags.RegisterTXXXKey('title_app', 'TITLEAPPENDIX')
 MyTags.RegisterTXXXKey('ext_artist', 'EXTENDEDARTIST')
 MyTags.RegisterTXXXKey('ext_album', 'EXTENDEDALBUM')
 MyTags.RegisterTXXXKey('ext_title', 'EXTENDEDTITLE')
+MyTags.RegisterTXXXKey('series_exc', 'SERIESEXCEPTION')
+MyTags.RegisterTXXXKey('album_artist_exc', 'ALBUMEARTISTXCEPTION')
+MyTags.RegisterTXXXKey('artist_exc', 'ALBUMEXCEPTION')
+MyTags.RegisterTXXXKey('album_exc', 'ALBUMEXCEPTION')
+MyTags.RegisterTXXXKey('title_exc', 'TITLEEXCEPTION')
 MyTags.RegisterTXXXKey('rym_type', 'RYMTYPE')
 MyTags.RegisterTXXXKey('rym_album', 'RYMALBUM')
 MyTags.RegisterTXXXKey('rym_artist', 'RYMARTIST')
+MyTags.RegisterTXXXKey('year_order', 'YEARORDER')
+MyTags.RegisterTXXXKey('year_order_digits', 'YEARORDERDIGITS')
+MyTags.RegisterTXXXKey('track_digits', 'TRACKDIGITS')
+MyTags.RegisterTXXXKey('performer', 'PERFORMER')
+MyTags.RegisterTXXXKey('super_genre', 'SUPERGENRE')
+MyTags.RegisterTXXXKey('sub_genre', 'SUBGENRE')
+MyTags.RegisterTXXXKey('genre_specifier', 'GENRESPECIFIER')
 MyTags.RegisterTXXXKey('sec_genres', 'SECONDARYGENRES')
 
 
@@ -93,6 +151,22 @@ class FixLyricsAttributes(Action):
         return "FixLyricsAttributes"
 
 
+class CheckPicture(Action):
+    def apply(self, tags: MyTags) -> None:
+        if 'APIC:' not in tags.get_id3():
+            print("%s has no picture" % prepare(tags.get_id3().filename))
+            return
+        picture = tags.get_id3()['APIC:']
+        width, height, mime = image_info(picture.data)
+        side = min(width, height)
+        if side < 450 or side > 600:
+            print("%s has bad picture size: (%d, %d)" % (prepare(tags.get_id3().filename), width, height))
+        tags.mime = mime
+
+    def key(self) -> str:
+        return "CheckPicture"
+
+
 action_list = [
     FixLyricsAttributes(),
     DeleteUnacceptableTags([
@@ -108,4 +182,5 @@ action_list = [
         'TXXX:ALBUMEXCEPTION', 'TXXX:ARTISTEXCEPTION', 'TXXX:TITLEEXCEPTION',
         'TXXX:RYMARTISTEXCEPTION', 'TXXX:RYMALBUMEXCEPTION', 'TXXX:RYMTYPEEXCEPTION',
     ]),
+    CheckPicture(),
 ]

@@ -7,7 +7,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
 __all__ = [
-    'id3_diff', 'Tags', 'ID3Tags', 'EasyID3Tags',
+    'id3_diff', 'Tags', 'ID3Tags', 'EasyID3Tags', 'prepare',
     'Action', 'ActionGenerator', 'Applier',
 ]
 
@@ -184,6 +184,10 @@ class Applier:
 
             if tags_changed:
                 tags.write(path)
+
+            # print(path)
+            # print(tags.get_id3().keys())
+            # print(tags.keys())
 
         except:
             print("Error occured while processing %s" % prepare(path))
