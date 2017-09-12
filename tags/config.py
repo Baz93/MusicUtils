@@ -27,7 +27,7 @@ class MyTags(EasyID3Tags):
     def __init__(self, path) -> None:
         assert os.path.abspath(path) == path
         super().__init__(path)
-        self.original_path = path
+        self.__original_path = path
 
     def copy(self) -> Any:
         return self.filename, super().copy()
@@ -52,8 +52,8 @@ class MyTags(EasyID3Tags):
         assert os.path.abspath(self.filename) == self.filename
         if not os.path.isdir(os.path.dirname(self.filename)):
             os.makedirs(os.path.dirname(self.filename))
-        os.rename(self.original_path, self.filename)
-        recursive_delete_empty_folders(os.path.dirname(self.original_path))
+        os.rename(self.__original_path, self.filename)
+        recursive_delete_empty_folders(os.path.dirname(self.__original_path))
         self.save(v1=ID3v1SaveOptions.CREATE, v2_version=3)
 
 
