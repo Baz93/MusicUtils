@@ -7,8 +7,6 @@ from contextlib import contextmanager
 import mutagen.id3
 from mutagen.id3 import ID3v1SaveOptions, ID3
 
-sys.path.insert(0, 'D:\\Programming\\dimensions')
-
 from dimensions import dimensions
 
 from .applier import Action, ActionGenerator, EasyID3Tags, prepare
