@@ -163,6 +163,22 @@ class DeleteTag(Action):
         return "DeleteTag %s" % self.id3_tag_key
 
 
+class CapitulateTXXXTag(Action):
+    def __init__(self, txxx_desc: str) -> None:
+        self.txxx_desc = txxx_desc
+
+    def apply(self, tags: MyTags) -> None:
+        tag_from = 'TXXX:' + self.txxx_desc
+        tag_to = 'TXXX:' + self.txxx_desc.upper()
+        if tag_from in tags.get_id3() and tag_from != tag_to:
+            tags.get_id3()[tag_to] = tags.get_id3()[tag_from]
+            tags.get_id3()[tag_to].desc = self.txxx_desc.upper()
+            del tags.get_id3()[tag_from]
+
+    def key(self) -> str:
+        return "CapitulateTXXXTag %s" % self.txxx_desc
+
+
 class DeleteUnacceptableTags(AllId3TagsActionGenerator):
     def __init__(self, acceptable_tags: List[str]) -> None:
         self.acceptable_tags = acceptable_tags
@@ -172,6 +188,14 @@ class DeleteUnacceptableTags(AllId3TagsActionGenerator):
             return DoNothing()
         else:
             return DeleteTag(key)
+
+
+class CapitulateTXXXTags(AllId3TagsActionGenerator):
+    def of_tag(self, key: str) -> Action:
+        if key.startswith('TXXX:'):
+            return CapitulateTXXXTag(key[5:])
+        else:
+            return DoNothing()
 
 
 class FixLyricsAttributes(Action):
@@ -206,6 +230,7 @@ class CheckPicture(Action):
 
 
 action_list = [
+    CapitulateTXXXTags(),
     FixLyricsAttributes(),
     DeleteUnacceptableTags([
         'APIC:', 'TALB', 'TPE1', 'TPE2', 'TCON', 'TIT2', 'TCOM', 'TDRC', 'TRCK', 'USLT::eng',
