@@ -29,6 +29,9 @@ class MyTags(EasyID3Tags):
         super().__init__(path)
         self.__original_path = path
 
+    def path(self) -> str:
+        return self.__original_path
+
     def copy(self) -> Any:
         return self.filename, super().copy()
 
@@ -100,7 +103,7 @@ def picture_delete(id3: ID3, key: str) -> None:
 
 
 MyTags.RegisterKey("lyrics", lyrics_get, lyrics_set, lyrics_delete)
-MyTags.RegisterKey("pic", lyrics_get, lyrics_set, lyrics_delete)
+MyTags.RegisterKey("picture", picture_get, picture_set, picture_delete)
 
 MyTags.RegisterTXXXKey('group', 'GROUP')
 MyTags.RegisterTXXXKey('country', 'COUNTRY')
@@ -187,13 +190,15 @@ class FixLyricsAttributes(Action):
 class CheckPicture(Action):
     def apply(self, tags: MyTags) -> None:
         if 'APIC:' not in tags.get_id3():
-            print("%s has no picture" % prepare(tags.get_id3().filename))
+            print("%s has no picture" % prepare(tags.path()))
             return
         picture = tags.get_id3()['APIC:']
         width, height, mime = image_info(picture.data)
         side = min(width, height)
-        if side < 450 or side > 600:
-            print("%s has bad picture size: (%d, %d)" % (prepare(tags.get_id3().filename), width, height))
+        if mime != 'image/jpeg':
+            print("%s has bad picture mime: %s" % (prepare(tags.path()), mime))
+        if side != 500:
+            print("%s has bad picture size: (%d, %d)" % (prepare(tags.path()), width, height))
         tags.mime = mime
 
     def key(self) -> str:
