@@ -49,7 +49,7 @@ class Tags:
     def diff(cls, value1: Any, value2: Any) -> List[str]:
         raise NotImplementedError()
 
-    def write(self, path: str) -> None:
+    def write(self) -> None:
         raise NotImplementedError()
 
 
@@ -183,7 +183,7 @@ class Applier:
                         tags_changed = True
 
             if tags_changed:
-                tags.write(path)
+                tags.write()
 
             # print(path)
             # print(tags.get_id3().keys())

@@ -1,6 +1,6 @@
 import sys
 import os
-from typing import List
+from typing import List, Any
 from tempfile import NamedTemporaryFile
 from contextlib import contextmanager
 
@@ -19,9 +19,44 @@ __all__ = [
 ]
 
 
+def recursive_delete_empty_folders(path: str) -> None:
+    while len(os.listdir(path)) == 0:
+        os.rmdir(path)
+        path = os.path.dirname(path)
+
+
 class MyTags(EasyID3Tags):
-    def write(self, path: str):
-        self.save(path, v1=ID3v1SaveOptions.CREATE, v2_version=3)
+    def __init__(self, path) -> None:
+        assert os.path.abspath(path) == path
+        super().__init__(path)
+        self.original_path = path
+
+    def copy(self) -> Any:
+        return self.filename, super().copy()
+
+    def restore(self, value: Any) -> None:
+        self.filename, id3_value = value
+        super().restore(id3_value)
+
+    @classmethod
+    def diff(cls, value1: Any, value2: Any) -> List[str]:
+        filename1, id3_value1 = value1
+        filename2, id3_value2 = value2
+
+        result = []
+        if filename1 != filename2:
+            result.append("path. %s --> %s" % (prepare(filename1), prepare(filename1)))
+
+        result.extend(super().diff(id3_value1, id3_value2))
+        return result
+
+    def write(self) -> None:
+        assert os.path.abspath(self.filename) == self.filename
+        if not os.path.isdir(os.path.dirname(self.filename)):
+            os.makedirs(os.path.dirname(self.filename))
+        os.rename(self.original_path, self.filename)
+        recursive_delete_empty_folders(os.path.dirname(self.original_path))
+        self.save(v1=ID3v1SaveOptions.CREATE, v2_version=3)
 
 
 @contextmanager
