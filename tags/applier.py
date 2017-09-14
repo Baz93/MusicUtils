@@ -5,7 +5,6 @@ from fnmatch import fnmatchcase
 
 from unidecode import unidecode
 from typing import List, Tuple, Any, Callable
-from mutagen import Metadata
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
@@ -36,7 +35,7 @@ def id3_diff(value1, value2) -> List[str]:
         before_sub = subs1[key] if key in subs1 else None
         after_sub = subs2[key] if key in subs2 else None
         for change in id3_diff(before_sub, after_sub):
-            result.append('. '.join(key, change))
+            result.append('. '.join((key, change)))
 
     return result
 
