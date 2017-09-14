@@ -1,8 +1,11 @@
 import os
 import sys
+from copy import deepcopy
 from fnmatch import fnmatchcase
+
 from unidecode import unidecode
 from typing import List, Tuple, Any, Callable
+from mutagen import Metadata
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3
 
@@ -39,29 +42,37 @@ def id3_diff(value1, value2) -> List[str]:
 
 
 class Tags:
-    def copy(self) -> Any:
+    def __init__(self, path) -> None:
+        super().__init__(path)
+        self.__backup = None
+        self.apply()
+
+    def apply(self) -> None:
+        self.__backup = deepcopy(self._copy())
+
+    def cancel(self) -> None:
+        self._restore(self.__backup)
+
+    def _copy(self) -> Any:
         raise NotImplementedError()
 
-    def restore(self, value: Any) -> None:
+    def _restore(self, value: Any) -> None:
         raise NotImplementedError()
 
     @classmethod
-    def diff(cls, value1: Any, value2: Any) -> List[str]:
+    def _diff2(cls, value1: Any, value2: Any) -> List[str]:
         raise NotImplementedError()
+
+    def diff(self) -> List[str]:
+        return self._diff2(self.__backup, self._copy())
 
     def write(self) -> None:
         raise NotImplementedError()
 
 
 class ID3Tags(Tags, ID3):
-    def copy(self) -> Any:
-        return self._copy()
-
-    def restore(self, value: Any) -> None:
-        return self._restore(value)
-
     @classmethod
-    def diff(cls, value1: Any, value2: Any) -> List[str]:
+    def _diff2(cls, value1: Any, value2: Any) -> List[str]:
         return id3_diff(value1, value2)
 
 
@@ -69,14 +80,14 @@ class EasyID3Tags(Tags, EasyID3):
     def get_id3(self) -> ID3:
         return self._EasyID3__id3
 
-    def copy(self) -> Any:
+    def _copy(self) -> Any:
         return self.get_id3()._copy()
 
-    def restore(self, value: Any) -> None:
+    def _restore(self, value: Any) -> None:
         return self.get_id3()._restore(value)
 
     @classmethod
-    def diff(cls, value1: Any, value2: Any) -> List[str]:
+    def _diff2(cls, value1: Any, value2: Any) -> List[str]:
         return id3_diff(value1, value2)
 
 
@@ -153,15 +164,14 @@ class Applier:
         return answer
 
     def process_action(self, path: str, tags: Tags, action: Action) -> bool:
-        prev_value = tags.copy()
         action.apply(tags)
-        new_value = tags.copy()
-        diff = tags.diff(prev_value, new_value)
+        diff = tags.diff()
         if len(diff) == 0:
             return False
         if self.decide_action(path, action.key(), diff):
+            tags.apply()
             return True
-        tags.restore(prev_value)
+        tags.cancel()
         return False
 
     def apply(self, path: str) -> None:

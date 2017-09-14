@@ -32,15 +32,15 @@ class MyTags(EasyID3Tags):
     def path(self) -> str:
         return self.__original_path
 
-    def copy(self) -> Any:
-        return self.filename, super().copy()
+    def _copy(self) -> Any:
+        return self.filename, super()._copy()
 
-    def restore(self, value: Any) -> None:
+    def _restore(self, value: Any) -> None:
         self.filename, id3_value = value
-        super().restore(id3_value)
+        super()._restore(id3_value)
 
     @classmethod
-    def diff(cls, value1: Any, value2: Any) -> List[str]:
+    def _diff2(cls, value1: Any, value2: Any) -> List[str]:
         filename1, id3_value1 = value1
         filename2, id3_value2 = value2
 
@@ -48,7 +48,7 @@ class MyTags(EasyID3Tags):
         if filename1 != filename2:
             result.append("path. %s --> %s" % (prepare(filename1), prepare(filename1)))
 
-        result.extend(super().diff(id3_value1, id3_value2))
+        result.extend(super()._diff2(id3_value1, id3_value2))
         return result
 
     def write(self) -> None:
